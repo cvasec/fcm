@@ -1,0 +1,10 @@
+{
+  "name": "fcm-tts-sender",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FCM TTS 앱으로 data 메시지를 보내는 예제",
+  "main": "send.js",
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}
