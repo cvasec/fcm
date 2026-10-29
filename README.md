@@ -2,8 +2,12 @@
 
 FCM 서버에서 받은 메시지를 **폰 내장 TTS(TextToSpeech)** 로 읽어 주는 Android용 React Native 앱입니다.
 
-- 앱이 포그라운드·백그라운드·종료 상태 모두에서 메시지를 받아 바로 읽습니다.
+- 앱이 포그라운드·백그라운드·종료·화면 꺼짐 상태 모두에서 메시지를 받아 바로 읽습니다.
 - 읽기 처리는 네이티브(Kotlin) `FirebaseMessagingService` 에서 하므로 JS 런타임이 떠 있지 않아도 동작합니다.
+- `data` 메시지와 `notification` 메시지를 모두 읽습니다. (`notification` 메시지는 백그라운드에서 SDK 가 알림만 띄우는데,
+  `handleIntent` 에서 가로채 함께 읽습니다.)
+- 읽는 동안에는 포그라운드 서비스("메시지를 읽는 중" 알림)로 프로세스를 유지하고, wake lock 과 오디오 포커스(다른 소리 볼륨 낮춤)를 잡습니다.
+  다 읽으면 서비스는 스스로 종료됩니다.
 - 화면에서 FCM 토큰 확인/공유, 읽기 켜기/끄기, 속도·높낮이·언어 설정, 테스트 읽기, 수신 기록(최근 50개)을 볼 수 있습니다.
 
 ## 구조
@@ -12,7 +16,8 @@ FCM 서버에서 받은 메시지를 **폰 내장 TTS(TextToSpeech)** 로 읽어
 App.tsx                         RN 화면 (토큰, 설정, 테스트, 수신 기록)
 src/FcmTts.ts                   네이티브 모듈 JS 래퍼 + 이벤트
 android/app/src/main/java/com/fcmtts/tts/
-  TtsMessagingService.kt        FCM 수신 → 기록 저장 → TTS 읽기
+  TtsMessagingService.kt        FCM 수신 (data + notification) → 기록 저장 → 읽기 시작
+  SpeechService.kt              읽는 동안 유지되는 포그라운드 서비스 (wake lock, 오디오 포커스)
   TtsSpeaker.kt                 TextToSpeech 래퍼 (초기화 전 대기열 처리)
   TtsSettings.kt                SharedPreferences 설정/기록 저장
   FcmTtsModule.kt               JS 용 네이티브 모듈 (getToken, speak, setSettings ...)
@@ -48,8 +53,9 @@ cd android && ./gradlew assembleRelease
 
 ## 메시지 보내기
 
-앱이 백그라운드/종료 상태에서도 읽으려면 **`notification` 없이 `data` 만 있는 메시지**를 보내야 합니다.
-(`notification` 메시지는 백그라운드에서 시스템이 알림만 띄우고 앱 코드를 호출하지 않습니다.)
+`data` 메시지와 `notification` 메시지 모두 읽지만, 알림 표시 없이 음성만 원하면 `data` 만 보내는 것을 권장합니다.
+**반드시 `android.priority: "high"`** 로 보내세요. 일반 우선순위 메시지는 도즈 상태에서 늦게 전달되고,
+백그라운드에서 포그라운드 서비스를 시작할 수 없습니다. (이 경우에도 약 18초 안에서는 읽지만 긴 문장은 잘릴 수 있습니다.)
 
 읽을 텍스트는 `data` 의 다음 키 중 처음 있는 값을 사용합니다: `text` → `tts` → `message` → `body`.
 `title` 은 기록에만 표시됩니다.
@@ -82,8 +88,9 @@ GOOGLE_APPLICATION_CREDENTIALS=./service-account.json node send.js "<기기 토�
 
 ## 참고
 
-- `android.priority: "high"` 로 보내야 도즈 모드에서도 즉시 전달됩니다.
-- 일부 제조사(삼성, 샤오미 등)는 배터리 최적화로 종료된 앱의 FCM 수신을 막을 수 있습니다.
-  설정 → 앱 → FCM TTS → 배터리 → "제한 없음" 으로 바꾸세요.
+- 앱 첫 화면에 "배터리 최적화 해제 필요" 카드가 보이면 눌러서 해제하세요. 화면 꺼짐/도즈 상태에서도 바로 읽게 됩니다.
+- 삼성: 설정 → 배터리 → 백그라운드 사용 한도 → "절전 예외 앱"에 추가. 샤오미: 앱 정보 → 배터리 절약 → "제한 없음", 자동 시작 허용.
+- 최근 앱 목록에서 **강제 종료(설정 → 강제 중지)** 한 앱은 Android 정책상 다시 실행할 때까지 FCM 을 받지 못합니다. (최근 앱에서 밀어서 닫는 것은 괜찮습니다.)
+- 무음/진동 모드에서도 미디어 볼륨으로 읽히는 기기가 대부분이며, 음량은 미디어(어시스턴트) 볼륨을 따릅니다.
 - 언어는 BCP-47 태그(`ko-KR`, `en-US` 등)로 입력합니다. 지원하지 않는 언어면 엔진 기본 언어로 읽습니다.
 - 소리는 `USAGE_ASSISTANT` 오디오 스트림으로 재생됩니다.

@@ -1,5 +1,10 @@
 package com.fcmtts.tts
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -79,6 +84,28 @@ class FcmTtsModule(private val reactContext: ReactApplicationContext) :
   fun clearHistory(promise: Promise) {
     TtsSettings.clearHistory(reactContext)
     promise.resolve(null)
+  }
+
+  @ReactMethod
+  fun isIgnoringBatteryOptimizations(promise: Promise) {
+    val pm = reactContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+    promise.resolve(pm.isIgnoringBatteryOptimizations(reactContext.packageName))
+  }
+
+  /** 배터리 최적화 예외를 요청하는 시스템 대화상자를 연다. 도즈/앱 대기 상태에서도 바로 읽기 위함. */
+  @ReactMethod
+  fun requestIgnoreBatteryOptimizations() {
+    val intent =
+        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+            .setData(Uri.parse("package:${reactContext.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+      reactContext.startActivity(intent)
+    } catch (e: Exception) {
+      reactContext.startActivity(
+          Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+              .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
   }
 
   // NativeEventEmitter 요구 사항

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  AppState,
   FlatList,
   PermissionsAndroid,
   Platform,
@@ -66,6 +67,7 @@ function App() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [settings, setSettings] = useState<TtsSettings | null>(null);
   const [history, setHistory] = useState<ReceivedMessage[]>([]);
+  const [batteryOk, setBatteryOk] = useState(true);
   const [testText, setTestText] = useState(
     '안녕하세요. FCM 음성 알림 테스트입니다.',
   );
@@ -92,7 +94,20 @@ function App() {
       ),
       FcmTts.onTokenRefresh(setToken),
     ];
-    return () => subs.forEach(s => s.remove());
+    const checkBattery = () =>
+      FcmTts.isIgnoringBatteryOptimizations().then(setBatteryOk);
+    checkBattery();
+    const appState = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        checkBattery();
+        refreshHistory();
+      }
+    });
+
+    return () => {
+      subs.forEach(s => s.remove());
+      appState.remove();
+    };
   }, [refreshHistory]);
 
   const updateSettings = (patch: Partial<TtsSettings>) => {
@@ -110,6 +125,20 @@ function App() {
           ListHeaderComponent={
             <>
               <Text style={styles.title}>FCM TTS</Text>
+
+              {!batteryOk && (
+                <View style={[styles.card, styles.warningCard]}>
+                  <Text style={styles.cardTitle}>배터리 최적화 해제 필요</Text>
+                  <Text style={styles.label}>
+                    백그라운드·화면 꺼짐 상태에서도 바로 읽으려면 이 앱을 배터리
+                    최적화에서 제외해야 합니다.
+                  </Text>
+                  <Button
+                    title="최적화 해제하기"
+                    onPress={() => FcmTts.requestIgnoreBatteryOptimizations()}
+                  />
+                </View>
+              )}
 
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>FCM 토큰</Text>
@@ -217,6 +246,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, gap: 12 },
   title: { fontSize: 28, fontWeight: '700', color: '#111', marginBottom: 4 },
   card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 10 },
+  warningCard: { backgroundColor: '#fff4e5' },
   cardTitle: { fontSize: 16, fontWeight: '600', color: '#111' },
   token: { fontSize: 12, color: '#333', fontFamily: 'monospace' },
   error: { color: '#c62828' },

@@ -17,6 +17,12 @@ import java.util.concurrent.ConcurrentHashMap
 object TtsSpeaker {
   private const val TAG = "TtsSpeaker"
 
+  val audioAttributes: AudioAttributes =
+      AudioAttributes.Builder()
+          .setUsage(AudioAttributes.USAGE_ASSISTANT)
+          .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+          .build()
+
   private var tts: TextToSpeech? = null
   private var ready = false
   private val pending = mutableListOf<Pair<String, String>>()
@@ -61,11 +67,7 @@ object TtsSpeaker {
             pending.clear()
           }
         }
-    tts?.setAudioAttributes(
-        AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ASSISTANT)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-            .build())
+    tts?.setAudioAttributes(audioAttributes)
     tts?.setOnUtteranceProgressListener(
         object : UtteranceProgressListener() {
           override fun onStart(utteranceId: String) {}

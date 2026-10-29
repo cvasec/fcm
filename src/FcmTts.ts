@@ -22,6 +22,8 @@ type FcmTtsNative = {
   setSettings(settings: Partial<TtsSettings>): Promise<TtsSettings>;
   getHistory(): Promise<ReceivedMessage[]>;
   clearHistory(): Promise<void>;
+  isIgnoringBatteryOptimizations(): Promise<boolean>;
+  requestIgnoreBatteryOptimizations(): void;
 };
 
 const native: FcmTtsNative = NativeModules.FcmTts;
